@@ -1,0 +1,20 @@
+[Unit]
+Description=ReqSys (%ENVIRONMENT%) - Docker Compose Stack
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%WORKDIR%
+Environment="COMPOSE_PROJECT_NAME=reqsys-%ENVIRONMENT%"
+Environment="BACKEND_PORT_%ENV_UPPER%=%BACKEND_PORT%"
+Environment="POSTGRES_PORT_%ENV_UPPER%=%POSTGRES_PORT%"
+Environment="GATEWAY_PORT_%ENV_UPPER%=%GATEWAY_PORT%"
+ExecStart=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.%ENVIRONMENT%.yml up -d
+ExecStop=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.%ENVIRONMENT%.yml down
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=%RESTART_SEC%s
+
+[Install]
+WantedBy=multi-user.target

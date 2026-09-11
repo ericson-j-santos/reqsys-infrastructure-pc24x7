@@ -1,0 +1,20 @@
+[Unit]
+Description=ReqSys (Production) - Docker Compose Stack
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/reqsys-admin/reqsys-prod
+Environment="COMPOSE_PROJECT_NAME=reqsys-prod"
+Environment="BACKEND_PORT_PROD=8212"
+Environment="POSTGRES_PORT_PROD=5434"
+Environment="GATEWAY_PORT_PROD=8083"
+ExecStart=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=15s
+
+[Install]
+WantedBy=multi-user.target
