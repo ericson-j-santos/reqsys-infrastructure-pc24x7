@@ -1,0 +1,50 @@
+name: Movimento Email Real Source — Infra CI
+
+on:
+  push:
+    branches:
+      - feat/movimento-email-real-source-20260918
+    paths:
+      - "docker-compose.movimento-email-real-source.yml"
+      - "movimento-email-real-source.env.example"
+      - "docs/movimento-email-real-source.md"
+      - ".github/workflows/movimento-email-real-source-ci.yml"
+  pull_request:
+    paths:
+      - "docker-compose.movimento-email-real-source.yml"
+      - "movimento-email-real-source.env.example"
+      - "docs/movimento-email-real-source.md"
+      - ".github/workflows/movimento-email-real-source-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  compose-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Validar compose sem segredos reais
+        env:
+          REQSYS_REPO_PATH: /tmp/reqsys
+          MOVIMENTO_EMAIL_SOURCE_DSN_FILE: /tmp/source.secret
+          MOVIMENTO_EMAIL_TARGET_DSN_FILE: /tmp/target.secret
+          MOVIMENTO_EMAIL_SOURCE_MAP_FILE: /tmp/source-map.json
+          REQSYS_SOURCE_SHA: test-sha
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.movimento-email-real-source.yml config > /tmp/compose.yml
+          grep -q "restart: unless-stopped" /tmp/compose.yml
+          grep -q "movimento_email_source_dsn" /tmp/compose.yml
+          grep -q "movimento_email_target_dsn" /tmp/compose.yml
+          grep -q "no-new-privileges:true" /tmp/compose.yml
+
+      - name: Bloquear segredo versionado
+        run: |
+          set -euo pipefail
+          if grep -RniE 'PWD=|Password=|User Id=|UID=.*;PWD='             docker-compose.movimento-email-real-source.yml             movimento-email-real-source.env.example             docs/movimento-email-real-source.md; then
+            echo "::error::Credencial SQL detectada em arquivo versionado."
+            exit 1
+          fi
