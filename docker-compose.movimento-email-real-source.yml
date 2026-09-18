@@ -1,0 +1,44 @@
+services:
+  movimento-email-real-source:
+    build:
+      context: ${REQSYS_REPO_PATH:?configure o checkout do ReqSys}
+      dockerfile: docker/movimento-email-real-source/Dockerfile
+    container_name: reqsys-movimento-email-real-source
+    restart: unless-stopped
+    environment:
+      MOVIMENTO_EMAIL_SOURCE_DSN_FILE: /run/secrets/movimento_email_source_dsn
+      MOVIMENTO_EMAIL_TARGET_DSN_FILE: /run/secrets/movimento_email_target_dsn
+      MOVIMENTO_EMAIL_SOURCE_MAP: /run/config/source-map.json
+      MOVIMENTO_EMAIL_EVIDENCE_ROOT: /var/lib/reqsys-24x7/movimento-email/evidence
+      MOVIMENTO_EMAIL_SYNC_INTERVAL_SECONDS: ${MOVIMENTO_EMAIL_SYNC_INTERVAL_SECONDS:-900}
+      MOVIMENTO_EMAIL_DATA_LAG_DAYS: ${MOVIMENTO_EMAIL_DATA_LAG_DAYS:-0}
+      MOVIMENTO_EMAIL_TIMEZONE: ${MOVIMENTO_EMAIL_TIMEZONE:-America/Sao_Paulo}
+      REQSYS_SOURCE_SHA: ${REQSYS_SOURCE_SHA:-unknown}
+    secrets:
+      - movimento_email_source_dsn
+      - movimento_email_target_dsn
+    volumes:
+      - ${MOVIMENTO_EMAIL_SOURCE_MAP_FILE:?configure o mapeamento real}:/run/config/source-map.json:ro
+      - ${MOVIMENTO_EMAIL_EVIDENCE_DIR:-./state/movimento-email/evidence}:/var/lib/reqsys-24x7/movimento-email/evidence
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import json, pathlib, sys
+          p=pathlib.Path('/var/lib/reqsys-24x7/movimento-email/evidence/latest.json')
+          d=json.loads(p.read_text()) if p.exists() else {}
+          sys.exit(0 if d.get('passed') else 1)
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+secrets:
+  movimento_email_source_dsn:
+    file: ${MOVIMENTO_EMAIL_SOURCE_DSN_FILE:?configure arquivo protegido com DSN da origem}
+  movimento_email_target_dsn:
+    file: ${MOVIMENTO_EMAIL_TARGET_DSN_FILE:?configure arquivo protegido com DSN do alvo DEV}
