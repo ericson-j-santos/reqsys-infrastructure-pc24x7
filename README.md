@@ -1,221 +1,121 @@
 # ReqSys Infrastructure — PC24x7
 
-Generic infrastructure-as-code for hosting ReqSys (or any Docker Compose application) on a 24x7 PC using:
+Infraestrutura auxiliar e contratos operacionais do host PC24x7 do ReqSys.
 
-- **Docker Compose** for app orchestration
-- **Cloudflare Tunnel** for public exposure (without port forwarding)
-- **Restic + Cloudflare R2** for encrypted backup
-- **Systemd** for automatic restart after power loss
+> **Fonte canônica do runtime DEV:** a orquestração ativa do ReqSys DEV pertence ao repositório
+> `ericson-j-santos/reqsys-v2-enterprise-real`. Este repositório não mantém uma segunda
+> implementação concorrente de deploy/runtime.
 
-**This repo is infrastructure-independent** — configure once, deploy ReqSys, ReqSys 2.0, or any Compose-based app.
+## Estado atual
 
-## Quick Start
+| Responsabilidade | Fonte canônica |
+|---|---|
+| Runtime ReqSys DEV | `reqsys-v2-enterprise-real` |
+| Supervisor local DEV | Windows Scheduled Task `ReqSys-Dev-Runtime-Supervisor` |
+| Exposição pública DEV | Cloudflare Quick Tunnel + locator assinado |
+| Validação de saúde | `/api/health`, `/api/runtime/health`, `/api/runtime/build-info` |
+| Evidência de publicação | deve usar o `expected_sha` imutável da execução |
+| Infraestrutura auxiliar / contratos do host | este repositório |
+| HML / PROD | fora deste incremento; nenhuma automação de deploy é declarada aqui |
 
-1. Clone ReqSys repository to `/home/reqsys-admin/reqsys-{dev,hml,prod}` on your 24x7 PC
-2. Customize `systemd/reqsys-*.service` files with your paths and ports
-3. Copy services to `/etc/systemd/system/` and enable them
-4. Install Cloudflare Tunnel and restic for backup
-5. Deploy
+O contrato versionado está em `config/pc24x7-dev-ownership.json`. O workflow
+`PC24x7 Repository Contract` valida esse contrato sem executar deploy, alterar
+segredos, promover ambiente ou tocar HML/PROD.
 
-See [docs/setup-linux.md](docs/setup-linux.md) for step-by-step guide.
+## Ownership do DEV
 
-## Repository Structure
+O runtime atual é implementado no repositório principal por estes componentes canônicos:
 
-```
-systemd/
-  ├── README.md                      — Installation & troubleshooting
-  ├── reqsys.service.template        — Generic template
-  ├── reqsys-dev.service             — Dev environment
-  ├── reqsys-hml.service             — Staging environment
-  └── reqsys-prod.service            — Production environment
+- `scripts/pc24x7_dev_runtime_supervisor.py`
+- `scripts/pc24x7_dev_runtime_supervisor_install.py`
+- `scripts/pc24x7_dev_locator_publisher.py`
+- `scripts/resolve_pc24x7_dev_locator.mjs`
+- `scripts/validate_publication_sync.py`
+- `infra/public-access-urls.json`
+- `.github/workflows/fly-automatic-environment-promotion.yml`
 
-docs/
-  ├── setup-linux.md                 — Full setup guide (Linux)
-  ├── setup-wsl2.md                  — Setup for WSL2 + Ubuntu
-  ├── cloudflare-tunnel.md           — Quick Tunnel & named tunnels
-  └── backup-restore.md              — Restic + R2 backup/restore
+O nome do último workflow é legado; o contrato atual suporta o provedor `pc24x7`.
+A infraestrutura não deve copiar essa lógica. Mudanças de runtime devem ocorrer na
+fonte canônica e chegar aqui apenas como contrato/integração de host.
 
-scripts/
-  ├── health-check.sh                — Health endpoint monitor
-  ├── monitor.sh                     — System monitoring (CPU, disk, uptime)
-  └── install-services.sh            — Automated install
+## Arquivos locais garantidos pelo contrato
 
-.github/workflows/
-  ├── deploy-pc24x7-dev.yml          — Auto-deploy on push to main
-  ├── deploy-pc24x7-hml.yml          — Manual deploy with approval
-  └── deploy-pc24x7-prod.yml         — Manual deploy + backup validation
-```
+O bloco abaixo é validado automaticamente. Se um caminho deixar de existir, ou a
+documentação divergir do manifesto, o CI falha fechado.
 
-## Key Features
+<!-- PC24X7_CONTRACT_PATHS_START -->
+- `README.md`
+- `config/pc24x7-dev-ownership.json`
+- `scripts/validate_repository_contract.py`
+- `.github/workflows/repository-contract-ci.yml`
+- `systemd/reqsys-dev.service`
+- `systemd/reqsys-hml.service`
+- `systemd/reqsys-prod.service`
+- `systemd/reqsys.service.template`
+- `systemd/README.md`
+- `docker-compose.movimento-email-real-source.yml`
+- `movimento-email-real-source.env.example`
+- `docs/movimento-email-real-source.md`
+- `.github/workflows/movimento-email-real-source-ci.yml`
+<!-- PC24X7_CONTRACT_PATHS_END -->
 
-### Automatic Restart
+## Systemd
 
-Systemd units ensure Docker Compose stacks restart after:
-- Power loss (requires BIOS auto-power-on setting)
-- System reboot
-- Docker daemon crash
+Os arquivos em `systemd/` permanecem como templates de infraestrutura Linux/WSL2 e
+referência histórica. **Eles não representam o mecanismo ativo do Desktop PC24x7 DEV**,
+que atualmente usa Windows Scheduled Task.
 
-### Public Exposure (No port forwarding)
+Não assumir que existam scripts de instalação, health check, backup ou workflows de
+deploy apenas porque foram descritos em versões anteriores deste README. Somente os
+caminhos do bloco contratual acima são garantidos localmente.
 
-Cloudflare Tunnel (`cloudflared`) handles:
-- Inbound connections from internet → PC on local network
-- No need to open ports on router
-- No IP address exposure
-- Free (up to 50 concurrent connections per app)
+## Movimento Email — fonte real
 
-### Backup & Restore
+A frente de Movimento Email possui infraestrutura própria neste repositório:
 
-Restic + Cloudflare R2 (10 GiB free):
-- Encrypted backups (AES-256-GCM)
-- Automated retention policies (14/30/90 days by environment)
-- Restore to any point-in-time
+- `docker-compose.movimento-email-real-source.yml`
+- `movimento-email-real-source.env.example`
+- `docs/movimento-email-real-source.md`
+- `.github/workflows/movimento-email-real-source-ci.yml`
 
-### CI/CD Workflows
+Credenciais reais não devem ser versionadas. O compose consome arquivos/variáveis
+provisionados no host.
 
-Three GitHub Actions workflows for deploy:
+## Controles obrigatórios do runtime DEV
 
-1. **dev**: Auto-deploy on every push to `main`
-   - No approval needed
-   - Smoke test on health endpoint
-   
-2. **hml**: Manual dispatch workflow
-   - Requires approval in GitHub environment
-   - Pre-deploy backup
-   
-3. **prod**: Manual dispatch + backup validation
-   - Gate: GitHub environment approval
-   - Pre-flight: R2 bucket + restic repository checks
-   - Pre-deploy backup mandatory
+O contrato de integração exige:
 
-## Cost (Phase 1)
+1. `expected_sha` exato; evidência de outro SHA não libera a execução.
+2. Os três endpoints de saúde/runtime antes de considerar a publicação pronta.
+3. Locator público assinado e fail-closed.
+4. HML e PROD fora do escopo deste CI.
+5. O CI deste repositório é somente de contrato; **não executa deploy**.
 
-| Item | Cost |
-|------|------|
-| PC 24x7 (electricity) | ~R$30–80/month |
-| Cloudflare Tunnel | Free (plan: Free) |
-| Backup (R2 + restic) | Free (10 GiB) |
-| **Total Phase 1** | **Electricity only** |
-
-## Cost (Phase 2 — optional domain)
-
-| Item | Cost |
-|------|------|
-| Domain (registrar) | ~R$40–60/year |
-| Cloudflare DNS | Free (plan: Free) |
-| Named Tunnel | Free (plan: Free) |
-| **Additional Phase 2** | **~R$3–5/month** |
-
-## Prerequisites
-
-### Hardware
-
-- PC with 4+ CPU cores, 4GB+ RAM, 100GB+ disk
-- 24x7 power supply (with UPS recommended)
-- Stable internet connection (cable/fiber preferred)
-
-### Software
-
-- Linux (Ubuntu 20.04+ recommended) OR WSL2 + Ubuntu
-- Docker Engine 20.10+
-- Docker Compose v2.0+
-- `cloudflared` CLI
-- `restic` for backups
-- `curl`, `jq` for health checks
-
-### Credentials / Secrets
+A validação local do contrato é:
 
 ```bash
-# Cloudflare
-CLOUDFLARE_ACCOUNT_ID=xxx
-CLOUDFLARE_API_TOKEN=xxx
-
-# R2 (S3-compatible)
-AWS_ACCESS_KEY_ID=xxx
-AWS_SECRET_ACCESS_KEY=xxx
-RESTIC_PASSWORD=xxx
-RESTIC_REPOSITORY=s3:https://...
+python -m py_compile scripts/validate_repository_contract.py
+python scripts/validate_repository_contract.py
 ```
 
-## Setup (30 minutes)
+Resultado esperado: JSON com `"status": "passed"`,
+`"exact_expected_sha_required": true`, `"hml_prod_touched": false` e
+`"deploy_executed": false`.
 
-```bash
-# 1. Install Docker, cloudflared, restic, curl, jq
-sudo apt update && sudo apt install -y docker.io docker-compose curl jq
-# ... (see docs/setup-linux.md for cloudflared + restic)
+## Política de custo
 
-# 2. Clone ReqSys
-cd /home/reqsys-admin
-git clone https://github.com/your-org/reqsys-v2-enterprise-real.git reqsys-dev
-cd reqsys-dev
-cp .env.example .env
-# Edit .env with your secrets
+A estratégia permanece de custo adicional zero:
 
-# 3. Copy systemd units
-sudo cp ../reqsys-infrastructure-pc24x7/systemd/*.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable reqsys-dev.service
-sudo systemctl start reqsys-dev.service
+- PC 24x7 já disponível;
+- Cloudflare Quick Tunnel no plano gratuito;
+- GitHub Actions hospedado para validações de contrato;
+- nenhuma dependência paga é introduzida por este incremento.
 
-# 4. Expose via Cloudflare Tunnel
-cloudflared tunnel --url http://localhost:8081
+## Critério para considerar DEV comprovado
 
-# 5. Setup backup (automated later)
-cd /home/reqsys-admin/reqsys-dev
-./scripts/pc24x7_backup_restic.sh dev
-```
+Este repositório, isoladamente, **não comprova que o runtime DEV está publicado**.
+A conclusão exige evidência do repositório principal e do runtime no mesmo SHA:
+saúde, `build-info`, locator vigente e validação pós-publicação.
 
-## Validation Checklist (before marking production-ready)
-
-- [ ] Service starts after reboot
-- [ ] Health endpoint responds consistently
-- [ ] Backup runs without errors (check `restic snapshots`)
-- [ ] Restore from backup successful (test restore locally)
-- [ ] Cloudflare Tunnel stays connected 7+ days
-- [ ] CPU/memory/disk usage acceptable
-- [ ] CI/CD workflow deploys successfully
-
-## Troubleshooting
-
-See [systemd/README.md](systemd/README.md) for systemd issues.
-
-See [docs/](docs/) for Cloudflare Tunnel and backup troubleshooting.
-
-## Development / Customization
-
-### For a different app
-
-1. Create new `docker-compose.yml` (or use existing)
-2. Customize `systemd/*.service`:
-   - `WorkingDirectory` → your app path
-   - `ExecStart` → your docker-compose command
-3. Adjust `BACKEND_PORT`, `POSTGRES_PORT`, `GATEWAY_PORT` as needed
-
-### For a different PC setup
-
-1. WSL2? See [docs/setup-wsl2.md](docs/setup-wsl2.md)
-2. Different paths? Edit `.service` files before installing
-3. Different ports? Update `GATEWAY_PORT_*` in `.service`
-
-## Documentation
-
-- [Systemd Units](systemd/README.md) — Installation, testing, troubleshooting
-- [Linux Setup](docs/setup-linux.md) — Complete step-by-step guide
-- [WSL2 Setup](docs/setup-wsl2.md) — Windows Subsystem for Linux 2
-- [Cloudflare Tunnel](docs/cloudflare-tunnel.md) — Quick Tunnel vs. named tunnels
-- [Backup & Restore](docs/backup-restore.md) — Restic + R2 operations
-
-## Related
-
-- [ReqSys Repository](https://github.com/ericson-j-santos/reqsys-v2-enterprise-real) — Main app
-- [ADR-046 — PC24x7](https://github.com/ericson-j-santos/reqsys-v2-enterprise-real/blob/main/docs/ADR/ADR-046-pc24x7-substituicao-flyio.md) — Architecture Decision Record
-- [Cloudflare Tunnel Docs](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
-- [Restic Documentation](https://restic.readthedocs.io/)
-
-## License
-
-Same as ReqSys repository.
-
-## Support
-
-For ReqSys-specific issues → check ReqSys repo  
-For PC24x7 infrastructure issues → open issue here
+Enquanto o runner/host físico não produzir essa evidência, o estado deve permanecer
+parcial/bloqueado — nunca “concluído” por documentação ou CI estático.

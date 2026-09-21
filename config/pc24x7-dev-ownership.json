@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "environment": "dev",
+  "runtime_owner": {
+    "repository": "ericson-j-santos/reqsys-v2-enterprise-real",
+    "branch": "main",
+    "host": "DESKTOP-PDQK954",
+    "operating_model": "windows_scheduled_task",
+    "task_name": "ReqSys-Dev-Runtime-Supervisor"
+  },
+  "canonical_runtime_paths": [
+    "scripts/pc24x7_dev_runtime_supervisor.py",
+    "scripts/pc24x7_dev_runtime_supervisor_install.py",
+    "scripts/pc24x7_dev_locator_publisher.py",
+    "scripts/resolve_pc24x7_dev_locator.mjs",
+    "scripts/validate_publication_sync.py",
+    "infra/public-access-urls.json",
+    ".github/workflows/fly-automatic-environment-promotion.yml"
+  ],
+  "required_upstream_controls": {
+    "exact_expected_sha_required": true,
+    "health_paths": [
+      "/api/health",
+      "/api/runtime/health",
+      "/api/runtime/build-info"
+    ],
+    "signed_locator_required": true,
+    "reuse_evidence_from_other_sha_allowed": false
+  },
+  "local_contract_paths": [
+    "README.md",
+    "config/pc24x7-dev-ownership.json",
+    "scripts/validate_repository_contract.py",
+    ".github/workflows/repository-contract-ci.yml",
+    "systemd/reqsys-dev.service",
+    "systemd/reqsys-hml.service",
+    "systemd/reqsys-prod.service",
+    "systemd/reqsys.service.template",
+    "systemd/README.md",
+    "docker-compose.movimento-email-real-source.yml",
+    "movimento-email-real-source.env.example",
+    "docs/movimento-email-real-source.md",
+    ".github/workflows/movimento-email-real-source-ci.yml"
+  ],
+  "scope": {
+    "dev_contract_governed": true,
+    "hml_deploy_automated_here": false,
+    "prod_deploy_automated_here": false,
+    "deploy_executed_by_this_contract_ci": false
+  }
+}

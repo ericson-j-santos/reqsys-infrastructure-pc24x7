@@ -1,0 +1,58 @@
+name: PC24x7 Repository Contract
+
+on:
+  push:
+    branches:
+      - main
+      - "fix/pc24x7-dev-contract-*"
+    paths:
+      - "README.md"
+      - "config/pc24x7-dev-ownership.json"
+      - "scripts/validate_repository_contract.py"
+      - ".github/workflows/repository-contract-ci.yml"
+  pull_request:
+    paths:
+      - "README.md"
+      - "config/pc24x7-dev-ownership.json"
+      - "scripts/validate_repository_contract.py"
+      - ".github/workflows/repository-contract-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pc24x7-repository-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-contract:
+    name: Validate PC24x7 ownership and documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Validate fail-closed repository contract
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/validate_repository_contract.py
+          python scripts/validate_repository_contract.py
+
+      - name: Negative control — cross-SHA evidence must stay forbidden
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("config/pc24x7-dev-ownership.json").read_text(encoding="utf-8"))
+          controls = payload["required_upstream_controls"]
+          assert controls["exact_expected_sha_required"] is True
+          assert controls["reuse_evidence_from_other_sha_allowed"] is False
+          assert payload["scope"]["hml_deploy_automated_here"] is False
+          assert payload["scope"]["prod_deploy_automated_here"] is False
+          assert payload["scope"]["deploy_executed_by_this_contract_ci"] is False
+          print("negative_control=passed")
+          PY
